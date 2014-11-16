@@ -1,0 +1,21 @@
+To Do on HexDame:
+
+Clerical:
+
+Separate out the board-game stuff to its own Git repository
+Put it on Github
+
+Performance:
+
+Should not be evaluating the game tree while interacting with pieces
+
+User Interface:
+
+Highlight movable pieces
+Highlight pieces in jeopardy
+Make player jump pieces one at a time
+Draw chosen computer move while Space is held down; execute when Space is released
+Draw a drop shadow under held piece
+Draw a better arrow for capture moves
+Make player move the AI's pieces?
+Maybe press buttons to switch current side's control?
