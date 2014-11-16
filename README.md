@@ -34,3 +34,9 @@ Additional Keys:
 The AI is using very basic [minimax] (http://en.wikipedia.org/wiki/Minimax) searching, a few levels deep.
 There's a debug display of the score of each move.
 The scoring function is a very basic net change in the difference between the number of pieces on each side.
+
+## TestGameTree
+
+A command-line driver for the HexDame AI. It just iterates moves with the computer playing both sides,
+printing the boards to the console. Press Ctrl+C if the game ends up in a draw. This is useful for
+profiling the game tree search.
