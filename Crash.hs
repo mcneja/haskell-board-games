@@ -15,6 +15,7 @@ data Terrain =
     Building |  -- Soldiers can be here
     Swamp |     -- Aliens can be here
     Rocket      -- Soldiers can be here, and if aliens touch it you lose
+    deriving Eq
 
 data PieceKind = Soldier | Alien deriving Eq
 
@@ -72,13 +73,17 @@ stepTime :: Float -> Game -> Game
 stepTime _ = id
 
 drawGame :: Game -> Picture
-drawGame g = Scale hexRadius hexRadius $ drawMap $ bsMap $ gmBoard g
+drawGame g = Scale hexRadius hexRadius $ Pictures [
+    drawMap $ bsMap $ gmBoard g,
+    drawPieces $ bsPieces $ gmBoard g
+    ]
 
 handleInputEvent :: Event -> Game -> Game
 handleInputEvent e g = case e of
     (EventKey (Char 'n') Down _ pos) -> (newGame (gmRandomSource g)) { gmMousePos = pos }
     (EventKey (MouseButton LeftButton) Down _ pos) -> onMouseDown (onMouseMove pos g)
     (EventKey (MouseButton LeftButton) Up _ pos) -> onMouseUp (onMouseMove pos g)
+    (EventKey (SpecialKey KeySpace) Down _ pos) -> moveMonsters (onMouseMove pos g)
     (EventMotion pos) -> onMouseMove pos g
     _ -> g
 
@@ -93,19 +98,20 @@ onMouseUp g = g
 
 newGame :: StdGen -> Game
 newGame r = Game {
-    gmBoard = Board { bsMap = board, bsPieces = [] },
+    gmBoard = Board { bsMap = board, bsPieces = pieces },
     gmMousePos = (1000, 0),
     gmRandomSource = r'
     }
-    where (r', board) = randomTileMap r
+    where (r', board, pieces) = randomTileMap r
 
-randomTileMap :: StdGen -> (StdGen, HexMap)
-randomTileMap rng0 = (rng2, board)
+randomTileMap :: StdGen -> (StdGen, HexMap, [Piece])
+randomTileMap rng0 = (rng2, board, pieces)
     where
-      board = buildMap tilemap
+      (board, pieces) = buildMap tilemap
       (tileListShuffled, rng1) = shuffleList tileList rng0
       (rng2, tilemap) = foldl' placeTileRandomly (rng1, initialTileMap) tileListShuffled
-      tileList = (take 25 (repeat openTile)) ++ (take 10 (repeat swampTile)) ++ (take 10 (repeat buildingTile))
+      tileList = (take 30 (repeat openTile)) ++ (take 10 (repeat swampTile)) ++ (take 5 (repeat buildingTile))
+      -- tileList = (take 25 (repeat openTile)) ++ (take 10 (repeat swampTile)) ++ (take 10 (repeat buildingTile))
       -- tileList = (take 16 (repeat openTile)) ++ (take 7 (repeat swampTile)) ++ (take 7 (repeat buildingTile))
 
 placeTileRandomly :: (StdGen, TileMap) -> Tile -> (StdGen, TileMap)
@@ -119,6 +125,24 @@ placeTileRandomly (rng, tilemap) tile = (rng'', (coord, rot, tile) : tilemap)
     (i, rng') = randomR (0, length validCoords - 1) rng
     coord = validCoords !! i
     (rot, rng'') = randomR (0, 5) rng'
+
+moveMonsters :: Game -> Game
+moveMonsters g = g { gmBoard = (gmBoard g) { bsPieces = pieces }, gmRandomSource = rng' }
+  where
+    piecesOrig = bsPieces (gmBoard g)
+    pieces = map (\p -> p { pcCoord = slideDest (pcCoord p) }) piecesOrig
+    (i, rng') = randomR (0, 5) (gmRandomSource g)
+    dir = neighborCoords!!i
+    slideDest :: Coord -> Coord
+    slideDest coord = if isRocket coord then coord
+        else if isValid (coord |+| dir) then slideDest (coord |+| dir) else coord
+    isValid :: Coord -> Bool
+    isValid coord = case Map.lookup coord (bsMap (gmBoard g)) of
+      Nothing -> False
+      Just terrain -> terrain /= Building
+    isRocket coord = case Map.lookup coord (bsMap (gmBoard g)) of
+      Nothing -> False
+      Just terrain -> terrain == Rocket
 
 -- |Given a sequence (e1,...en) to shuffle, its length, and a random
 -- generator, compute the corresponding permutation of the input
@@ -143,11 +167,23 @@ neighborCoords = [ (-1, -1), (-1, 0), (0, -1), (1, 0), (0, 1), (1, 1) ]
 drawMap :: HexMap -> Picture
 drawMap m = Pictures $ map (uncurry drawTile) (Map.toList m)
 
+drawPieces :: [Piece] -> Picture
+drawPieces = Pictures . (map drawPiece)
+
+drawPiece :: Piece -> Picture
+drawPiece piece = Color color $ translateCoord (pcCoord piece) $ circleSolid 0.7
+  where
+    color = case (pcKind piece) of
+          Alien -> red
+          Soldier -> blue
+
 drawTile :: Coord -> Terrain -> Picture
 drawTile coord terrain = Color (hexColor coord terrain) $ translateCoord coord hex
 
-buildMap :: TileMap -> HexMap
-buildMap = foldl' (\m (c, r, t) -> addTile c r t m) Map.empty
+buildMap :: TileMap -> (HexMap, [Piece])
+buildMap tiles = (board, pieces)
+  where
+    (board, pieces) = foldl' (\m (c, r, t) -> addTile c r t m) (Map.empty, []) tiles
 
 initialTileMap :: TileMap
 initialTileMap = [
@@ -171,11 +207,18 @@ buildingTile = [Building, Open, Open, Building, Open, Open, Open]
 rocketTile :: [Terrain]
 rocketTile = [Rocket, Open, Open, Rocket, Open, Open, Open]
 
-addTile :: Coord -> Rotation -> Tile -> HexMap -> HexMap
-addTile clusterCoord rot terrains m = foldl' addSubTile m (zip (map transform coords) terrains)
-    where addSubTile m (coord, terrain) = Map.insert coord terrain m
-          transform = transformCoord clusterCoord rot
-          coords = [(-1, -1), (0, -1), (-1, 0), (0, 0), (1, 0), (0, 1), (1, 1)]
+addTile :: Coord -> Rotation -> Tile -> (HexMap, [Piece]) -> (HexMap, [Piece])
+addTile clusterCoord rot terrains (m, p) = (m', p')
+  where
+    m' = foldl' addSubTile m (zip (map transform coords) terrains)
+    p' = if isTerrainOpen then Piece { pcCoord = transform (0, 0), pcKind = Alien } : p else p
+    addSubTile m (coord, terrain) = Map.insert coord terrain m
+    transform = transformCoord clusterCoord rot
+    coords = [(-1, -1), (0, -1), (-1, 0), (0, 0), (1, 0), (0, 1), (1, 1)]
+    isTerrainOpen = case terrains!!3 of
+      Open -> True
+      Swamp -> True
+      otherwise -> False
 
 transformCoord :: Coord -> Rotation -> Coord -> Coord
 transformCoord (clusterI, clusterJ) rot (i, j) = (originI + dirII * i + dirJI * j, originJ + dirIJ * i + dirJJ * j)
