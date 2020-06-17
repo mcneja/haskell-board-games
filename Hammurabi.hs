@@ -12,8 +12,6 @@ import System.IO (hFlush, stdout)
 import Text.Printf (printf)
 import Text.Read (readMaybe)
 
--- Data structures
-
 data GameState = GameState {
     gsYear         :: Int,
     gsPeople       :: Int,
@@ -30,8 +28,6 @@ data Results = Results {
     resBushelsEatenByRats :: Int,
     resBushelsPerAcre     :: Int
 } deriving (Show)
-
--- Code
 
 initialState = GameState {
     gsYear = 0,
