@@ -2,13 +2,7 @@
 -- Modified for 8K Microsoft BASIC by Peter Turnbull
 -- Ported to Haskell by James McNeill
 
-{-
-TODO Add a help command
-     Help would give you some of the things to think about, and maybe some specific numbers.
--}
-
-import Control.Monad
-import Control.Monad.IO.Class
+import Control.Monad (when)
 import Control.Monad.Random
 import Data.List (minimumBy)
 import Data.Ord (comparing)
@@ -21,60 +15,55 @@ import Text.Read (readMaybe)
 -- Data structures
 
 data GameState = GameState {
-    year         :: Int,
-    people       :: Int,
-    food         :: Int, -- bushels
-    land         :: Int, -- acres
-    totalDeaths  :: Int,
-    cumDeathRate :: Double
+    gsYear         :: Int,
+    gsPeople       :: Int,
+    gsFood         :: Int, -- bushels
+    gsLand         :: Int, -- acres
+    gsTotalDeaths  :: Int,
+    gsCumDeathRate :: Double
 } deriving (Show)
 
 data Results = Results {
-    peopleStarved      :: Int,
-    peopleDiedOfPlague :: Int,
-    peopleBorn         :: Int,
-    bushelsEatenByRats :: Int,
-    bushelsPerAcre     :: Int
+    resPeopleStarved      :: Int,
+    resPeopleDiedOfPlague :: Int,
+    resPeopleBorn         :: Int,
+    resBushelsEatenByRats :: Int,
+    resBushelsPerAcre     :: Int
 } deriving (Show)
-
-type RandIO = RandT StdGen IO
 
 -- Code
 
 initialState = GameState {
-    year = 0,
-    people = 100,
-    food = 2800,
-    land = 1000,
-    totalDeaths = 0,
-    cumDeathRate = 0 }
+    gsYear = 0,
+    gsPeople = 100,
+    gsFood = 2800,
+    gsLand = 1000,
+    gsTotalDeaths = 0,
+    gsCumDeathRate = 0 }
 
 initialResults = Results 0 0 5 200 3
 
-main = getStdGen >>= evalRandT playGame
-
-playGame :: RandIO ()
-playGame = do
-    liftIO $ putStrLn "Try your hand at governing ancient Sumeria successfully for a 10-year term of office."
-    liftIO $ printResults initialState initialResults
+main = do
+    putStrLn "Try your hand at governing ancient Sumeria successfully for a 10-year term of office."
+    printResults initialState initialResults
     finalState <- repeatN 10 doYear initialState
     printFinalReport finalState
 
-doYear :: GameState -> RandIO GameState
+doYear :: GameState -> IO GameState
 doYear s0 = do
     s1 <- buyOrSellLand s0
-    bushelsForFood <- liftIO $ askBushelsForFood s1
-    acresToPlant <- liftIO $ askAcresToPlant s1 { food = (food s1) - bushelsForFood }
+    bushelsForFood <- askBushelsForFood s1
+    acresToPlant <- askAcresToPlant s1 { gsFood = (gsFood s1) - bushelsForFood }
     (sOut, resultsOut) <- applyOrders bushelsForFood acresToPlant s1
-    liftIO $ printResults sOut resultsOut
-    let fractionStarved = (fromIntegral (peopleStarved resultsOut)) / (fromIntegral (people s0))
-    when (fractionStarved > 0.45) $ liftIO $ do
-        printf "You starved %d people in one year!\n" (peopleStarved resultsOut)
+    printResults sOut resultsOut
+    let fractionStarved = (fromIntegral (resPeopleStarved resultsOut)) / (fromIntegral (gsPeople s0))
+    when (fractionStarved > 0.45) $ do
+        printf "You starved %d people in one year!\n" (resPeopleStarved resultsOut)
         putStr finkMessage
         exitSuccess
     return sOut
 
-applyOrders :: MonadRandom m => Int -> Int -> GameState -> m (GameState, Results)
+applyOrders :: Int -> Int -> GameState -> IO (GameState, Results)
 applyOrders bushelsEaten acresPlanted state = do
 
     birthD6 <- rollD6
@@ -82,17 +71,17 @@ applyOrders bushelsEaten acresPlanted state = do
     plagueHappens <- rollProbability 0.15
     ratD6 <- rollD6
 
-    let bushelsInit = food state
+    let bushelsInit = gsFood state
         bushelsPlanted = acresPlanted `div` 2
         bushelsBeforeRats = bushelsInit - (bushelsEaten + bushelsPlanted)
-        bushelsEatenByRats = if (ratD6 `mod` 2) == 1
-            then 0
-            else bushelsBeforeRats `div` ratD6
+        bushelsEatenByRats = if (ratD6 `mod` 2) == 0
+            then bushelsBeforeRats `div` ratD6
+            else 0
         bushelsHarvested = bushelsPerAcre * acresPlanted
         bushelsFinal = (bushelsBeforeRats - bushelsEatenByRats) + bushelsHarvested
 
-        peopleInit = people state
-        peopleBorn = 1 + ((birthD6 * (20 * (land state) + bushelsFinal)) `div` (peopleInit * 100))
+        peopleInit = gsPeople state
+        peopleBorn = 1 + ((birthD6 * (20 * (gsLand state) + bushelsFinal)) `div` (peopleInit * 100))
         peopleFed = min peopleInit (bushelsEaten `div` 20)
         peopleStarved = peopleInit - peopleFed
         peopleBeforePlague = peopleFed + peopleBorn
@@ -101,42 +90,41 @@ applyOrders bushelsEaten acresPlanted state = do
             else 0
         peopleFinal = peopleBeforePlague - peopleDiedOfPlague
 
-        cumDeathRateOut = (cumDeathRate state) + (fromIntegral peopleStarved) /
+        cumDeathRateOut = (gsCumDeathRate state) + (fromIntegral peopleStarved) /
             (fromIntegral peopleInit)
 
     return (
         state {
-            year = (year state) + 1,
-            people = peopleFinal,
-            food = bushelsFinal,
-            totalDeaths = (totalDeaths state) + peopleDiedOfPlague + peopleStarved,
-            cumDeathRate = cumDeathRateOut },
+            gsYear = (gsYear state) + 1,
+            gsPeople = peopleFinal,
+            gsFood = bushelsFinal,
+            gsTotalDeaths = (gsTotalDeaths state) + peopleDiedOfPlague + peopleStarved,
+            gsCumDeathRate = cumDeathRateOut },
         Results {
-            peopleStarved = peopleStarved,
-            peopleDiedOfPlague = peopleDiedOfPlague,
-            peopleBorn = peopleBorn,
-            bushelsEatenByRats = bushelsEatenByRats,
-            bushelsPerAcre = bushelsPerAcre }
+            resPeopleStarved = peopleStarved,
+            resPeopleDiedOfPlague = peopleDiedOfPlague,
+            resPeopleBorn = peopleBorn,
+            resBushelsEatenByRats = bushelsEatenByRats,
+            resBushelsPerAcre = bushelsPerAcre }
         )
 
-buyOrSellLand :: GameState -> RandIO GameState
+buyOrSellLand :: GameState -> IO GameState
 buyOrSellLand s = do
     landPrice <- getRandomR (17, 26)
-    liftIO $ do
-        printf "Land is trading at %d bushels per acre.\n" landPrice
-        acresToBuy <- askAcresToBuy s landPrice
-        acresToSell <- if acresToBuy > 0 then return 0 else askAcresToSell s landPrice
-        let acresChange = acresToBuy - acresToSell
-        return s {
-            land = (land s) + acresChange,
-            food = (food s) - landPrice * acresChange }
+    printf "Land is trading at %d bushels per acre.\n" landPrice
+    acresToBuy <- askAcresToBuy s landPrice
+    acresToSell <- if acresToBuy > 0 then return 0 else askAcresToSell s landPrice
+    let acresChange = acresToBuy - acresToSell
+    return s {
+        gsLand = (gsLand s) + acresChange,
+        gsFood = (gsFood s) - landPrice * acresChange }
 
 askAcresToBuy :: GameState -> Int -> IO Int
 askAcresToBuy s landPrice = askNumber nMax nDefault promptMsg retryMsg helpMsg where
     promptMsg = "How many acres do you wish to buy"
-    retryMsg = printf "You have only %d bushels of grain" (food s)
+    retryMsg = printf "You have only %d bushels of grain" (gsFood s)
     helpMsg = buySellHelp s landPrice
-    nMax = (food s) `div` landPrice
+    nMax = (gsFood s) `div` landPrice
     nDefault = 0
 
 askAcresToSell :: GameState -> Int -> IO Int
@@ -144,7 +132,7 @@ askAcresToSell s landPrice = askNumber nMax nDefault promptMsg retryMsg helpMsg 
     promptMsg = "How many acres do you wish to sell"
     retryMsg = printf "You have only %d acres" nMax
     helpMsg = buySellHelp s landPrice
-    nMax = land s
+    nMax = gsLand s
     nDefault = 0
 
 buySellHelp :: GameState -> Int -> String
@@ -153,25 +141,25 @@ buySellHelp s landPrice
     | acres < 0 = printf "For feeding and planting you need %d bushels, which requires selling %d acres." foodNeeded (negate acres)
     | otherwise = printf "You have exactly enough food for feeding and planting."
     where
-    foodNeeded = 25 * (people s) -- 20 bushels for eating and 5 for planting
+    foodNeeded = 25 * (gsPeople s) -- 20 bushels for eating and 5 for planting
     acres :: Int
-    acres = floor $ fromIntegral ((food s) - foodNeeded) / fromIntegral landPrice
+    acres = floor (fromIntegral ((gsFood s) - foodNeeded) / fromIntegral landPrice)
 
 askBushelsForFood :: GameState -> IO Int
 askBushelsForFood s = askNumber nMax nDefault promptMsg retryMsg helpMsg where
     promptMsg = "How many bushels do you wish to feed your people"
-    retryMsg = printf "You have only %d bushels of grain" (food s)
+    retryMsg = printf "You have only %d bushels of grain" (gsFood s)
     helpMsg = "Each person needs 20 bushels of grain for the year to not starve."
-    nMax = food s
-    nDefault = min nMax (20 * (people s))
+    nMax = gsFood s
+    nDefault = min nMax (20 * (gsPeople s))
 
 askAcresToPlant :: GameState -> IO Int
 askAcresToPlant s = askNumber nMax nDefault promptMsg retryMsg helpMsg where
     promptMsg = "How many acres do you wish to plant with seed"
     (nMax, retryMsg) = minimumBy (comparing fst) [
-        (land s, printf "You own only %d acres" (land s)),
-        (2 * (food s), printf "You have only %d bushels of grain" (food s)),
-        (10 * (people s), printf "You have only %d people to tend the fields" (people s)) ]
+        (gsLand s, printf "You own only %d acres" (gsLand s)),
+        (2 * (gsFood s), printf "You have only %d bushels of grain" (gsFood s)),
+        (10 * (gsPeople s), printf "You have only %d people to tend the fields" (gsPeople s)) ]
     helpMsg = "One bushel of food can plant two acres; one person can tend ten acres."
     nDefault = nMax
 
@@ -180,7 +168,7 @@ askNumber nMax nDefault promptMsg retryMsg helpMsg =
     if nMax <= 0 then
         return 0
     else do
-        putStr $ printf "%s (0-%d)? [%d] " promptMsg nMax nDefault
+        printf "%s (0-%d)? [%d] " promptMsg nMax nDefault
         hFlush stdout
         line <- getLine
         case line of
@@ -199,7 +187,7 @@ askNumber nMax nDefault promptMsg retryMsg helpMsg =
                         putStrLn "Get yourself another steward!!!!!"
                         exitSuccess
                     else if n > nMax then do
-                        putStrLn $ printf "Hammurabi: Think again. %s. Now then," retryMsg
+                        printf "Hammurabi: Think again. %s. Now then,\n" retryMsg
                         askNumber nMax nDefault promptMsg retryMsg helpMsg
                     else
                         return n
@@ -207,23 +195,23 @@ askNumber nMax nDefault promptMsg retryMsg helpMsg =
 printResults :: GameState -> Results -> IO ()
 printResults state results = do
     printf "\nHamurabi: I beg to report to you,\n"
-    printf "In year %d, %d people starved, %d came to the city.\n" (year state) (peopleStarved results) (peopleBorn results)
-    printf "%s" (if (peopleDiedOfPlague results) > 0 then "A horrible plague struck! Half the people died.\n" else "")
-    printf "Population is now %d.\n" (people state)
-    printf "The city now owns %d acres.\n" (land state)
-    when ((land state) > 0) $
-        printf "You harvested %d bushels per acre.\n" (bushelsPerAcre results)
-    printf "Rats ate %d bushels.\n" (bushelsEatenByRats results)
-    printf "You now have %d bushels in store.\n" (food state)
+    printf "In year %d, %d people starved, %d came to the city.\n" (gsYear state) (resPeopleStarved results) (resPeopleBorn results)
+    printf "%s" (if (resPeopleDiedOfPlague results) > 0 then "A horrible plague struck! Half the people died.\n" else "")
+    printf "Population is now %d.\n" (gsPeople state)
+    printf "The city now owns %d acres.\n" (gsLand state)
+    when ((gsLand state) > 0) $
+        printf "You harvested %d bushels per acre.\n" (resBushelsPerAcre results)
+    printf "Rats ate %d bushels.\n" (resBushelsEatenByRats results)
+    printf "You now have %d bushels in store.\n" (gsFood state)
 
-printFinalReport :: GameState -> RandIO ()
+printFinalReport :: GameState -> IO ()
 printFinalReport s = do
-    let numPeople = people s
+    let numPeople = gsPeople s
     numHaters <- getRandomR (0, (numPeople * 4) `div` 5)
-    let numYears = year s
-        numAcres = land s
-        numDeaths = totalDeaths s
-        avgDeathRate = (cumDeathRate s) / (fromIntegral numYears)
+    let numYears = gsYear s
+        numAcres = gsLand s
+        numDeaths = gsTotalDeaths s
+        avgDeathRate = (gsCumDeathRate s) / (fromIntegral numYears)
         acresPerPerson = (fromIntegral numAcres) / (fromIntegral numPeople)
         comments
             | avgDeathRate > 0.33 || acresPerPerson < 7 = finkMessage
@@ -247,9 +235,8 @@ printFinalReport s = do
             "You started with 10 acres per person and ended with " ++
             show (round acresPerPerson) ++ " acres per person.\n" ++
             comments
-    liftIO $ do
-        putStr msg
-        putStrLn "So long for now."
+    putStr msg
+    putStrLn "So long for now."
 
 finkMessage :: String
 finkMessage =
@@ -257,10 +244,10 @@ finkMessage =
     "been impeached and thrown out of office but you have\n" ++
     "also been declared 'National Fink' !!\n"
 
-rollD6 :: MonadRandom m => m Int
+rollD6 :: IO Int
 rollD6 = getRandomR (1, 6)
 
-rollProbability :: MonadRandom m => Double -> m Bool
+rollProbability :: Double -> IO Bool
 rollProbability probability = fmap (< probability) getRandom
 
 repeatN :: (Monad m) => Int -> (a -> m a) -> a -> m a
