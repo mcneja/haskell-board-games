@@ -1,6 +1,5 @@
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
-import Graphics.Gloss.Data.Extent (Coord)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
 import qualified Data.Set as Set
@@ -9,6 +8,8 @@ import Data.Maybe
 import System.Random
 
 -- Types
+
+type Coord = (Int, Int)
 
 data Star = Star {
     starPos :: Point
@@ -47,7 +48,7 @@ main = do
         handleInputEvent
         stepTime
     where displayMode = InWindow "Galaxy" (boardSizeX, boardSizeY) (5, 5)
-          backgroundColor = makeColor8 16 16 48 255
+          backgroundColor = makeColorI 16 16 48 255
           framesPerSecond = 100
 
 stepTime :: Float -> Game -> Game
@@ -69,7 +70,7 @@ drawStars :: Game -> Picture
 drawStars g = Pictures $ map drawStar (gmStars g)
 
 drawStar :: Star -> Picture
-drawStar star = Translate x y $ Color (makeColor8 190 190 224 255) $ circleSolid starRadius
+drawStar star = Translate x y $ Color (makeColorI 190 190 224 255) $ circleSolid starRadius
   where
     (x, y) = starPos star
 
@@ -97,7 +98,7 @@ positionIsUsable :: [Point] -> Point -> Bool
 positionIsUsable setPos pos = not $ any (tooClose pos) setPos
 
 tooClose :: Point -> Point -> Bool
-tooClose (x0, y0) (x1, y1) = dx * dx + dy * dy < minStarSeparation * minStarSeparation
+tooClose (x0, y0) (x1, y1) = dx^2 + dy^2 < minStarSeparation^2
   where
     dx = x1 - x0
     dy = y1 - y0

@@ -1,6 +1,5 @@
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
-import Graphics.Gloss.Data.Extent (Coord)
 import Data.List (foldl', nub, sortBy)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
@@ -9,6 +8,8 @@ import System.Random
 import System.Random.Shuffle
 
 -- Types
+
+type Coord = (Int, Int)
 
 data Terrain =
     Open |      -- Soldiers and aliens can be here
@@ -64,7 +65,7 @@ main = do
         handleInputEvent
         stepTime
     where displayMode = InWindow "Crash" (sizeX, sizeY) (5, 5)
-          backgroundColor = makeColor8 170 180 145 255
+          backgroundColor = makeColorI 170 180 145 255
           framesPerSecond = 100
           sizeX = 768
           sizeY = 700
@@ -103,16 +104,18 @@ newGame r = Game {
     gmRandomSource = r'
     }
     where (r', board, pieces) = randomTileMap r
+    -- where (r', board, pieces) = boringTileMap r
 
 randomTileMap :: StdGen -> (StdGen, HexMap, [Piece])
 randomTileMap rng0 = (rng2, board, pieces)
     where
       (board, pieces) = buildMap tilemap
-      (tileListShuffled, rng1) = shuffleList tileList rng0
       (rng2, tilemap) = foldl' placeTileRandomly (rng1, initialTileMap) tileListShuffled
-      tileList = (take 30 (repeat openTile)) ++ (take 10 (repeat swampTile)) ++ (take 5 (repeat buildingTile))
+      (tileListShuffled, rng1) = shuffleList tileList rng0
+      -- tileList = (take 15 (repeat openTile)) ++ (take 15 (repeat swampTile)) ++ (take 15 (repeat buildingTile))
+      -- tileList = (take 10 (repeat openTile)) ++ (take 10 (repeat swampTile)) ++ (take 25 (repeat buildingTile))
       -- tileList = (take 25 (repeat openTile)) ++ (take 10 (repeat swampTile)) ++ (take 10 (repeat buildingTile))
-      -- tileList = (take 16 (repeat openTile)) ++ (take 7 (repeat swampTile)) ++ (take 7 (repeat buildingTile))
+      tileList = (take 16 (repeat openTile)) ++ (take 7 (repeat swampTile)) ++ (take 7 (repeat buildingTile))
 
 placeTileRandomly :: (StdGen, TileMap) -> Tile -> (StdGen, TileMap)
 placeTileRandomly (rng, tilemap) tile = (rng'', (coord, rot, tile) : tilemap)
@@ -120,11 +123,26 @@ placeTileRandomly (rng, tilemap) tile = (rng'', (coord, rot, tile) : tilemap)
     tileCoords = map (\(coord, _, _) -> coord) tilemap
     allCoords = nub $ [ i |+| j | i <- tileCoords, j <- neighborCoords ]
     adjCoords = filter (`notElem` tileCoords) allCoords
-    validCoords = filter (\c -> hasAtLeastTwoNeighbors c) adjCoords
+    validCoords = filter isOnBoard $ filter hasAtLeastTwoNeighbors adjCoords
     hasAtLeastTwoNeighbors c = (>= 2) $ length $ filter (\c2 -> elem (c |+| c2) tileCoords) neighborCoords
     (i, rng') = randomR (0, length validCoords - 1) rng
     coord = validCoords !! i
     (rot, rng'') = randomR (0, 5) rng'
+
+boringTileMap :: StdGen -> (StdGen, HexMap, [Piece])
+boringTileMap rng = (rng, board, pieces)
+  where
+    (board, pieces) = buildMap tilemap
+    tilemap = foldl' fillTile initialTileMap tileCoords
+    tileCoords = [ (i, j) | i <- [-3..4], j <- [-3..4], i - j < 5, j - i < 4 ]
+
+fillTile :: TileMap -> Coord -> TileMap
+fillTile tilemap coord = if slotInUse then tilemap else (coord, 0, openTile) : tilemap
+  where
+    slotInUse = not $ null $ filter (\(c, _, _) -> c == coord) tilemap
+
+isOnBoard :: Coord -> Bool
+isOnBoard (i, j) = i <= 4 && j <= 4 && i > -4 && j > -4 && i - j < 5 && j - i < 4
 
 moveMonsters :: Game -> Game
 moveMonsters g = g { gmBoard = (gmBoard g) { bsPieces = pieces }, gmRandomSource = rng' }
@@ -205,7 +223,8 @@ buildingTile :: [Terrain]
 buildingTile = [Building, Open, Open, Building, Open, Open, Open]
 
 rocketTile :: [Terrain]
-rocketTile = [Rocket, Open, Open, Rocket, Open, Open, Open]
+--rocketTile = [Rocket, Open, Open, Rocket, Open, Open, Open]
+rocketTile = take 7 (repeat Rocket)
 
 addTile :: Coord -> Rotation -> Tile -> (HexMap, [Piece]) -> (HexMap, [Piece])
 addTile clusterCoord rot terrains (m, p) = (m', p')
@@ -241,7 +260,7 @@ hexCoordFromClusterCoord :: Coord -> Coord
 hexCoordFromClusterCoord (i, j) = (2 * i + j, 3 * j - i)
 
 openHexColors :: [ Color ]
-openHexColors = map (\(r, g, b) -> makeColor8 r g b 255) colors
+openHexColors = map (\(r, g, b) -> makeColorI r g b 255) colors
     where colors = [ (85, 106, 47), (94, 117, 52), (77, 96, 43) ]
 
 buildingHexColors :: [ Color ]

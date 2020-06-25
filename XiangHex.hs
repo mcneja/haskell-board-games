@@ -1,7 +1,8 @@
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
-import Graphics.Gloss.Data.Extent (Coord)
 import Data.Maybe
+
+type Coord = (Int, Int)
 
 data Side = Red | Blue
     deriving (Show, Eq, Enum, Bounded)
@@ -27,7 +28,7 @@ main = play
         handleInputEvent
         stepTime
     where displayMode = InWindow "Xiang Hex" (sizeX, sizeY) (5, 5)
-          backgroundColor = makeColor8 170 180 145 255
+          backgroundColor = makeColorI 170 180 145 255
           framesPerSecond = 100
           sizeX = 1024
           sizeY = 768
@@ -114,15 +115,15 @@ hexColor c
 baseBoardColor = cycleColors [ (85, 106, 47), (94, 117, 52), (77, 96, 43) ]
 lowerPalaceColor = cycleColors [ (155, 114, 17), (211, 180, 8), (182, 140, 34) ]
 upperPalaceColor = cycleColors [ (155, 114, 17), (182, 140, 34), (211, 180, 8) ]
-riverColor = makeColor8 69 129 179 255
+riverColor = makeColorI 69 129 179 255
 
 sideColor :: Side -> Color
-sideColor Red = makeColor8 255 190 180 255
-sideColor Blue = makeColor8 180 190 255 255
+sideColor Red = makeColorI 255 190 180 255
+sideColor Blue = makeColorI 180 190 255 255
 
 cycleColors :: [ (Int, Int, Int) ] -> Coord -> Color
 cycleColors rgbs (i, j) = colors!!((i + j) `mod` (length colors))
-    where colors = map (\(r, g, b) -> makeColor8 r g b 255) rgbs
+    where colors = map (\(r, g, b) -> makeColorI r g b 255) rgbs
 
 translateCoord :: Coord -> Picture -> Picture
 translateCoord (i, j) = Translate x y

@@ -1,6 +1,5 @@
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
-import Graphics.Gloss.Data.Extent (Coord)
 import Data.Function (on)
 import Data.List (sortBy)
 import qualified Data.Map.Strict as Map
@@ -12,6 +11,8 @@ import Data.Tree
 import System.Random
 
 -- Types
+
+type Coord = (Int, Int)
 
 data ETree n e = ENode {
     etRoot :: n,
@@ -87,7 +88,7 @@ main = do
         handleInputEvent
         stepTime
     where displayMode = InWindow "HexDame" (sizeX, sizeY) (5, 5)
-          backgroundColor = makeColor8 170 180 145 255
+          backgroundColor = makeColorI 170 180 145 255
           framesPerSecond = 100
           sizeX = 768
           sizeY = 700
@@ -174,7 +175,7 @@ onMouseDown g = case pieceAt (bsPieces (gameBoard g)) mouseGridPos of
                 }
     where mouseScreenPos = gmMousePos g
           mouseGridPos = gridFromScreen mouseScreenPos
-          mouseScreenOffset = ((screenFromGrid mouseGridPos) |*| hexRadius) - mouseScreenPos
+          mouseScreenOffset = ((screenFromGrid mouseGridPos) |*| hexRadius) |-| mouseScreenPos
 
 onMouseUp :: Game -> Game
 onMouseUp g = case (gmHeldPiece g) of
@@ -302,12 +303,12 @@ hexColor = cycleColors [ (85, 106, 47), (94, 117, 52), (77, 96, 43) ]
 
 sideColor :: Side -> Color
 sideColor side = case side of
-    Red -> makeColor8 255 190 180 255
-    Blue -> makeColor8 180 190 255 255
+    Red -> makeColorI 255 190 180 255
+    Blue -> makeColorI 180 190 255 255
 
 cycleColors :: [ (Int, Int, Int) ] -> Coord -> Color
 cycleColors rgbs (i, j) = colors!!((i + j) `mod` (length colors))
-    where colors = map (\(r, g, b) -> makeColor8 r g b 255) rgbs
+    where colors = map (\(r, g, b) -> makeColorI r g b 255) rgbs
 
 translateCoord :: Coord -> Picture -> Picture
 translateCoord = (uncurry Translate) . screenFromGrid
@@ -492,6 +493,9 @@ toggleSide Blue = Red
 
 (|+|) :: Num a => (a, a) -> (a, a) -> (a, a)
 (i0, j0) |+| (i1, j1) = (i0 + i1, j0 + j1)
+
+(|-|) :: Num a => (a, a) -> (a, a) -> (a, a)
+(x0, y0) |-| (x1, y1) = (x0 - x1, y0 - y1)
 
 (|*|) :: Num a => (a, a) -> a -> (a, a)
 (x, y) |*| s = (x * s, y * s)

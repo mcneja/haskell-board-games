@@ -161,6 +161,7 @@ askAcresToPlant s = askNumber nMax nDefault promptMsg retryMsg helpMsg where
 
 askNumber :: Int -> Int -> String -> String -> String -> IO Int
 askNumber nMax nDefault promptMsg retryMsg helpMsg =
+    let retry = askNumber nMax nDefault promptMsg retryMsg helpMsg in
     if nMax <= 0 then
         return 0
     else do
@@ -172,11 +173,11 @@ askNumber nMax nDefault promptMsg retryMsg helpMsg =
             "q" -> exitSuccess
             "h" -> do
                 putStrLn helpMsg
-                askNumber nMax nDefault promptMsg retryMsg helpMsg
+                retry
             otherwise -> case readMaybe line of
                 Nothing -> do
                     putStrLn "Hammurabi: I did not understand that number. Now then,"
-                    askNumber nMax nDefault promptMsg retryMsg helpMsg
+                    retry
                 Just n ->
                     if n < 0 then do
                         putStrLn "Hammurabi: I cannot do what you wish!"
@@ -184,7 +185,7 @@ askNumber nMax nDefault promptMsg retryMsg helpMsg =
                         exitSuccess
                     else if n > nMax then do
                         printf "Hammurabi: Think again. %s. Now then,\n" retryMsg
-                        askNumber nMax nDefault promptMsg retryMsg helpMsg
+                        retry
                     else
                         return n
 
