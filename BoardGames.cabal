@@ -59,3 +59,8 @@ executable TestGameTree
   import:              shared-properties
   main-is:             TestGameTree.hs
   build-depends:       containers, random
+
+executable TicTacToe
+  import:              shared-properties
+  main-is:             TicTacToe.hs
+  build-depends:       gloss

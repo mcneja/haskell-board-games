@@ -134,13 +134,13 @@ markX = Color red $ Pictures
 
 markO = Color blue $ thickCircle (gridSize * 0.275) lineWidth
 
-highlightMarkX = Color (makeColor8 255 220 220 255) $ Pictures
+highlightMarkX = Color (makeColorI 255 220 220 255) $ Pictures
     [ Rotate 45 $ rectangleSolid (gridSize * 0.75) lineWidth
     , Rotate (-45) $ rectangleSolid (gridSize * 0.75) lineWidth ]
 
-highlightMarkO = Color (makeColor8 220 220 255 255) $ thickCircle (gridSize * 0.275) lineWidth
+highlightMarkO = Color (makeColorI 220 220 255 255) $ thickCircle (gridSize * 0.275) lineWidth
 
-backgroundGrid = Color (makeColor8 192 192 192 255) $ Pictures
+backgroundGrid = Color (makeColorI 192 192 192 255) $ Pictures
     [ Translate (-r) 0  verticalLine
     , Translate r 0     verticalLine
     , Translate 0 (-r)  horizontalLine
@@ -150,4 +150,4 @@ backgroundGrid = Color (makeColor8 192 192 192 255) $ Pictures
 
 horizontalLine = rectangleSolid (gridSize * 3) lineWidth
 verticalLine = rectangleSolid lineWidth (gridSize * 3)
-winSquare = Color (makeColor8 200 255 200 255) $ rectangleSolid gridSize gridSize
+winSquare = Color (makeColorI 200 255 200 255) $ rectangleSolid gridSize gridSize
